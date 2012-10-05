@@ -744,7 +744,7 @@ function webform_get_submission_controller() {
     return $submission_controller;
   }
   else {
-    throw ErrorException('Unable to determine submission controller class.');
+    throw new ErrorException('Unable to determine submission controller class.');
   }
 }
 
