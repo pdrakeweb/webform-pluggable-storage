@@ -449,7 +449,7 @@ function webform_component_edit_form($form, $form_state, $node, $component, $clo
       '#description' => t('Private fields are shown only to users with results access.'),
       '#weight' => 45,
       '#parents' => array('extra', 'private'),
-      '#disabled' => !webform_results_access($node),
+      '#disabled' => empty($node->nid) ? FALSE : !webform_results_access($node),
     );
   }
 
@@ -483,22 +483,21 @@ function webform_component_edit_form($form, $form_state, $node, $component, $clo
     '#attributes' => array('class' => array('webform-position')),
   );
 
-  if (variable_get('webform_enable_fieldset', TRUE) && is_array($node->webform['components'])) {
-    $options = array('0' => t('Root'));
-    foreach ($node->webform['components'] as $existing_cid => $value) {
-      if (webform_component_feature($value['type'], 'group') && (!isset($component['cid']) || $existing_cid != $component['cid'])) {
-        $options[$existing_cid] = $value['name'];
-      }
+  $options = array('0' => t('Root'));
+  foreach ($node->webform['components'] as $existing_cid => $value) {
+    if (webform_component_feature($value['type'], 'group') && (!isset($component['cid']) || $existing_cid != $component['cid'])) {
+      $options[$existing_cid] = $value['name'];
     }
-    $form['position']['pid'] = array(
-      '#type' => 'select',
-      '#title' => t('Parent Fieldset'),
-      '#default_value' => $component['pid'],
-      '#description' => t('Optional. You may organize your form by placing this component inside another fieldset.'),
-      '#options' => $options,
-      '#weight' => 3,
-    );
   }
+  $form['position']['pid'] = array(
+    '#type' => 'select',
+    '#title' => t('Parent'),
+    '#default_value' => $component['pid'],
+    '#description' => t('Optional. You may organize your form by placing this component inside another fieldset.'),
+    '#options' => $options,
+    '#access' => count($options) > 1,
+    '#weight' => 3,
+  );
   $form['position']['weight'] = array(
     '#type' => 'textfield',
     '#size' => 4,
@@ -507,69 +506,6 @@ function webform_component_edit_form($form, $form_state, $node, $component, $clo
     '#description' => t('Optional. In the menu, the heavier items will sink and the lighter items will be positioned nearer the top.'),
     '#weight' => 4,
   );
-
-  // Add conditional fields.
-  $conditional_components = array();
-  $counter = 0;
-  $last_pagebreak_slice = 0;
-  foreach ($node->webform['components'] as $cid => $test_component) {
-    // Only components before the pagebreak can be considered.
-    if ($test_component['type'] == 'pagebreak') {
-      $last_pagebreak_slice = $counter;
-    }
-    if (isset($component['cid']) && $cid == $component['cid']) {
-      break;
-    }
-    if (webform_component_feature($test_component['type'], 'conditional')) {
-      $conditional_components[$cid] = $test_component;
-      $counter++;
-    }
-  }
-  if ($component['type'] != 'pagebreak') {
-    $fieldset_description = t('Create a rule to control whether or not to skip this page.');
-  }
-  else {
-    $fieldset_description = t('Create a rule to control whether or not to show this form element.');
-  }
-  $conditional_components = array_slice($conditional_components, 0, $last_pagebreak_slice, TRUE);
-  $form['conditional'] = array(
-    '#weight' => 10,
-    '#type' => 'fieldset',
-    '#title' => t('Conditional rules'),
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-    '#description' => t('Create a rule to control whether or not to show this form element.'),
-    '#tree' => FALSE,
-  );
-  $form['conditional']['extra'] = array(
-    '#tree' => TRUE,
-  );
-  $form['conditional']['extra']['conditional_component'] = array(
-    '#type' => 'select',
-    '#title' => t('Component'),
-    '#options' => webform_component_list($node, $conditional_components, FALSE, TRUE),
-    '#description' => t('Select another component to decide whether to show or hide this component. You can only select components occurring before the most recent pagebreak.'),
-    '#default_value' => $component['extra']['conditional_component'],
-  );
-  $form['conditional']['extra']['conditional_operator'] = array(
-    '#type' => 'select',
-    '#title' => t('Operator'),
-    '#options' => array(
-      '=' => t('Is one of'),
-      '!=' => t('Is not one of')
-    ),
-    '#description' => t('Determines whether the list below is inclusive or exclusive.'),
-    '#default_value' => $component['extra']['conditional_operator'],
-  );
-  $form['conditional']['extra']['conditional_values'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Values'),
-    '#description' => t('List values, one per line, that will trigger this action. If you leave this blank, this component will always display.'),
-    '#default_value' => $component['extra']['conditional_values'],
-  );
-  if (empty($conditional_components)) {
-    $form['conditional']['#access'] = FALSE;
-  }
 
   // Add the fields specific to this component type:
   $additional_form_elements = (array) webform_component_invoke($component['type'], 'edit', $component);
@@ -918,6 +854,7 @@ function webform_component_feature($type, $feature) {
     'group' => FALSE,
     'attachment' => FALSE,
     'private' => TRUE,
+    'views_range' => FALSE,
   );
   return isset($components[$type]['features'][$feature]) ? $components[$type]['features'][$feature] : !empty($defaults[$feature]);
 }
@@ -1093,11 +1030,6 @@ function webform_component_defaults(&$component) {
         $component['extra'][$extra] = $default;
       }
     }
-    $component['extra'] += array(
-      'conditional_component' => '',
-      'conditional_operator' => '=',
-      'conditional_values' => '',
-    );
   }
 }
 
