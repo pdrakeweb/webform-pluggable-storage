@@ -354,14 +354,8 @@ function theme_webform_display_number($variables) {
 function _webform_analysis_number($component, $sids = array(), $single = FALSE) {
   $advanced_stats = $single;
 
-  $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->fields('wsd', array('data'))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid']);
-
-  if (count($sids)) {
-    $query->condition('sid', $sids, 'IN');
-  }
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids, array('data'));
 
   $population = array();
   $submissions = 0;
@@ -369,7 +363,6 @@ function _webform_analysis_number($component, $sids = array(), $single = FALSE) 
   $not_empty = 0;
   $sum = 0;
 
-  $result = $query->execute();
   foreach ($result as $data) {
     $value = trim($data['data']);
     if ($value == '') {

@@ -365,17 +365,8 @@ function theme_webform_display_date($variables) {
  * Implements _webform_analysis_component().
  */
 function _webform_analysis_date($component, $sids = array()) {
-  $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->fields('wsd', array('no', 'data'))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid'])
-    ->orderBy('sid');
-
-  if (count($sids)) {
-    $query->condition('sid', $sids, 'IN');
-  }
-
-  $result = $query->execute();
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids);
 
   $dates = array();
   $submissions = 0;

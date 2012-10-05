@@ -4010,12 +4010,15 @@ function webform_ctools_plugin_api($module, $api) {
 }
 
 /**
- * Implements hook_ctools_plugin_plugins().
+ * Implements hook_ctools_plugin_type().
  */
-function webform_ctools_plugin_plugins() {
+function webform_ctools_plugin_type() {
   return array(
-    'cache' => TRUE,
-    'use hooks' => TRUE,
+    'plugins' => array(
+      'cache' => TRUE,
+      'use hooks' => TRUE,
+      'classes' => array('handler'),
+    ),
   );
 }
 

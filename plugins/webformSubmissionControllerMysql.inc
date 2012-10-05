@@ -220,4 +220,38 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
     $next_query->addExpression('MIN(sid)');
     return $next_query->execute()->fetchField();
   }
+
+  public function getComponentSubmissionData($component, $sids = array(), $fields = array('no', 'data')) {
+    $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
+    ->fields('wsd', $fields)
+    ->condition('nid', $component['nid'])
+    ->condition('cid', $component['cid']);
+
+    if (count($sids)) {
+      $query->condition('sid', $sids, 'IN');
+    }
+
+    return $query->execute();
+  }
+
+  public function deleteComponentSubmissionData($component) {
+    db_delete('webform_submitted_data')
+    ->condition('nid', $node->nid)
+    ->condition('cid', $component['cid'])
+    ->execute();
+  }
+
+  public function validateComponentSubmissionUnique($nid, $cid, $value, $sid = FALSE) {
+    $query = db_select('webform_submitted_data')
+      ->fields('webform_submitted_data', array('sid'))
+      ->condition('nid', $nid)
+      ->condition('cid', $element['#webform_component']['cid'])
+      ->condition('data', $element['#value'])
+      ->range(0, 1); // More efficient than using countQuery() for data checks.
+    if ($sid) {
+      $query->condition('sid', $sid, '<>');
+    }
+    return ($query->execute()->fetchField() != 0);
+  }
+
 }

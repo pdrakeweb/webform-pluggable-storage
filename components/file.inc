@@ -418,20 +418,13 @@ function _webform_attachments_file($component, $value) {
  * Implements _webform_analysis_component().
  */
 function _webform_analysis_file($component, $sids = array()) {
-  $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->fields('wsd', array('no', 'data'))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid']);
-
-  if (count($sids)) {
-    $query->condition('sid', $sids, 'IN');
-  }
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids);
 
   $nonblanks = 0;
   $sizetotal = 0;
   $submissions = 0;
 
-  $result = $query->execute();
   foreach ($result as $data) {
     $file = webform_get_file($data['data']);
     if (isset($file->filesize)) {

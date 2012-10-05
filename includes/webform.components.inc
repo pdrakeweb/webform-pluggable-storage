@@ -787,10 +787,9 @@ function webform_component_delete($node, $component) {
     ->condition('nid', $node->nid)
     ->condition('cid', $component['cid'])
     ->execute();
-  db_delete('webform_submitted_data')
-    ->condition('nid', $node->nid)
-    ->condition('cid', $component['cid'])
-    ->execute();
+
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->deleteComponentSubmissionData($component);
 
   // Delete all elements under this element.
   $result = db_select('webform_component', 'c')
@@ -1040,17 +1039,11 @@ function webform_validate_unique($element, $form_state) {
   if ($element['#value'] !== '') {
     $nid = $form_state['values']['details']['nid'];
     $sid = $form_state['values']['details']['sid'];
-    $query = db_select('webform_submitted_data')
-      ->fields('webform_submitted_data', array('sid'))
-      ->condition('nid', $nid)
-      ->condition('cid', $element['#webform_component']['cid'])
-      ->condition('data', $element['#value'])
-      ->range(0, 1); // More efficient than using countQuery() for data checks.
-    if ($sid) {
-      $query->condition('sid', $sid, '<>');
-    }
-    $count = $query->execute()->fetchField();
-    if ($count) {
+    $cid = $element['#webform_component']['cid'];
+    $value = $element['#value'];
+
+    $submission_controller = webform_get_submission_controller();
+    if (!$submission_controller->validateComponentSubmissionUnique($nid, $cid, $value, $sid)) {
       form_error($element, t('The value %value has already been submitted once for the %title field. You may have already submitted this form, or you need to use a different value.', array('%value' => $element['#value'], '%title' => $element['#title'])));
     }
   }
