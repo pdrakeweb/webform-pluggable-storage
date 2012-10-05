@@ -3904,3 +3904,87 @@ function webform_mollom_form_info($form_id) {
 
   return $form_info;
 }
+
+/**
+ * Implements hook_ctools_plugin_api().
+ */
+function webform_ctools_plugin_api($module, $api) {
+  if ($module == 'webform' && $api == 'plugins') {
+    return array('version' => 3);
+  }
+}
+
+/**
+ * Implements hook_ctools_plugin_plugins().
+ */
+function webform_ctools_plugin_plugins() {
+  return array(
+    'cache' => TRUE,
+    'use hooks' => TRUE,
+  );
+}
+
+/**
+ * Implements hook_spaces_plugins().
+ */
+function webform_webform_plugins() {
+  $plugins = array();
+  $plugins['webformSubmissionController'] = array(
+    'handler' => array(
+      'path' => drupal_get_path('module', 'webform') .'/plugins',
+      'file' => 'webformSubmissionController.inc',
+      'class' => 'webformSubmissionController',
+      ),
+  );
+  $plugins['webformSubmissionControllerMysql'] = array(
+    'handler' => array(
+      'path' => drupal_get_path('module', 'webform') .'/plugins',
+      'file' => 'webformSubmissionControllerMysql.inc',
+      'class' => 'webformSubmissionControllerMysql',
+      'parent' => 'storageController',
+    ),
+  );
+  return $plugins;
+}
+
+/**
+ * Implements hook_webform_registry().
+ */
+function webform_webform_registry() {
+  return array(
+    'controllers' => array(
+      'submission' => array(
+        'title' => t('MySQL'),
+        'plugin' => 'webformSubmissionControllerMysql',
+      ),
+    ),
+  );
+}
+
+/**
+ * Get the registry of webform controllers.
+ */
+function webform_controllers($reset = FALSE) {
+  return _webform_registry('controllers', $reset);
+}
+
+/**
+ * Registry retrieval and caching.
+ */
+function _webform_registry($key = NULL, $reset = FALSE) {
+  static $registry;
+  if (!isset($registry) || $reset) {
+    if (!$reset && $cache = cache_get('webform_registry', 'cache')) {
+      $registry = $cache->data;
+    }
+    else {
+      $registry = module_invoke_all('webform_registry');
+      drupal_alter('webform_registry', $registry);
+      cache_set('webform_registry', $registry);
+    }
+  }
+  if (isset($key)) {
+    return isset($registry[$key]) ? $registry[$key] : array();
+  }
+  return $registry;
+}
