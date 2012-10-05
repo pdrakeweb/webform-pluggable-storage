@@ -1,3 +1,5 @@
+<?php
+
 /**
  * @file Defines the webformSubmissionController class.
  */

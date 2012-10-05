@@ -1,3 +1,5 @@
+<?php
+
 /**
  * @file Defines the webformSubmissionControllerMysql class.
  */
@@ -147,5 +149,75 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
       $counts[$nid][$uid] = $query->countQuery()->execute()->fetchField();
     }
     return $counts[$nid][$uid];
+  }
+
+  public function insertSubmission($node, $submission) {
+    drupal_write_record('webform_submissions', $submission);
+    foreach ($submission->data as $cid => $values) {
+      foreach ($values as $delta => $value) {
+        $data = array(
+            'nid' => $node->webform['nid'],
+            'sid' => $submission->sid,
+            'cid' => $cid,
+            'no' => $delta,
+            'data' => is_null($value) ? '' : $value,
+        );
+        drupal_write_record('webform_submitted_data', $data);
+      }
+    }
+    return $submission;
+  }
+
+  public function updateSubmission($node, $submission) {
+    // Update the main submission info.
+    drupal_write_record('webform_submissions', $submission, 'sid');
+
+    // If is draft, only delete data for components submitted, to
+    // preserve any data from form pages not visited in this submission.
+    if ($submission->is_draft) {
+      $submitted_cids = array_keys($submission->data);
+      if ($submitted_cids) {
+        db_delete('webform_submitted_data')
+          ->condition('sid', $submission->sid)
+          ->condition('cid', $submitted_cids, 'IN')
+          ->execute();
+      }
+    }
+    else {
+      db_delete('webform_submitted_data')
+        ->condition('sid', $submission->sid)
+        ->execute();
+    }
+
+    // Then re-add submission data to the database.
+    $submission->is_new = FALSE;
+    webform_submission_insert($node, $submission);
+  }
+
+  public function deleteSubmission($node, $submission) {
+    db_delete('webform_submitted_data')
+    ->condition('nid', $node->nid)
+    ->condition('sid', $submission->sid)
+    ->execute();
+    db_delete('webform_submissions')
+    ->condition('nid', $node->nid)
+    ->condition('sid', $submission->sid)
+    ->execute();
+  }
+
+  public function getPreviousSubmissionID($node, $submission) {
+    $previous_query = db_select('webform_submissions')
+    ->condition('nid', $node->nid)
+    ->condition('sid', $submission->sid, '<');
+    $previous_query->addExpression('MAX(sid)');
+    return $previous_query->execute()->fetchField();
+  }
+
+  public function getNextSubmissionID($node, $submission) {
+    $next_query = db_select('webform_submissions')
+    ->condition('nid', $node->nid)
+    ->condition('sid', $submission->sid, '<');
+    $next_query->addExpression('MIN(sid)');
+    return $next_query->execute()->fetchField();
   }
 }

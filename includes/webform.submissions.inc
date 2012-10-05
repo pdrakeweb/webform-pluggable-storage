@@ -55,29 +55,8 @@ function webform_submission_update($node, $submission) {
     $function($node, $submission);
   }
 
-  // Update the main submission info.
-  drupal_write_record('webform_submissions', $submission, 'sid');
-
-  // If is draft, only delete data for components submitted, to
-  // preserve any data from form pages not visited in this submission.
-  if ($submission->is_draft) {
-    $submitted_cids = array_keys($submission->data);
-    if ($submitted_cids) {
-      db_delete('webform_submitted_data')
-        ->condition('sid', $submission->sid)
-        ->condition('cid', $submitted_cids, 'IN')
-        ->execute();
-    }
-  }
-  else {
-    db_delete('webform_submitted_data')
-      ->condition('sid', $submission->sid)
-      ->execute();
-  }
-
-  // Then re-add submission data to the database.
-  $submission->is_new = FALSE;
-  webform_submission_insert($node, $submission);
+  $submission_controller = webform_get_submission_controller();
+  $submission = $submission_controller->updateSubmission($node, $submission);
 
   module_invoke_all('webform_submission_update', $node, $submission);
 
@@ -103,22 +82,11 @@ function webform_submission_insert($node, $submission) {
       $function($node, $submission);
     }
     $submission->nid = $node->webform['nid'];
-    drupal_write_record('webform_submissions', $submission);
     $is_new = TRUE;
   }
 
-  foreach ($submission->data as $cid => $values) {
-    foreach ($values as $delta => $value) {
-      $data = array(
-        'nid' => $node->webform['nid'],
-        'sid' => $submission->sid,
-        'cid' => $cid,
-        'no' => $delta,
-        'data' => is_null($value) ? '' : $value,
-      );
-      drupal_write_record('webform_submitted_data', $data);
-    }
-  }
+  $submission_controller = webform_get_submission_controller();
+  $submission = $submission_controller->insertSubmission($node, $submission);
 
   // Invoke the insert hook after saving all the data.
   if (isset($is_new)) {
@@ -149,14 +117,8 @@ function webform_submission_delete($node, $submission) {
     unset($_SESSION['webform_submission'][$submission->sid]);
   }
 
-  db_delete('webform_submitted_data')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid)
-    ->execute();
-  db_delete('webform_submissions')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid)
-    ->execute();
+  $submission_controller = webform_get_submission_controller();
+  $submission = $submission_controller->deleteSubmission($node, $submission);
 
   module_invoke_all('webform_submission_delete', $node, $submission);
 }
@@ -601,10 +563,9 @@ function webform_submission_render($node, $submission, $email, $format) {
 function webform_get_submissions($filters = array(), $header = NULL, $pager_count = 0) {
   $submissions = array();
 
-  if ($submission_controller = webform_get_submission_controller()) {
-    $submission_controller->loadSubmissions($filters, $header, $pager_count);
-    $submissions = $submission_controller->submissions;
-  }
+  $submission_controller = webform_get_submission_controller();
+  $submission_controller->loadSubmissions($filters, $header, $pager_count);
+  $submissions = $submission_controller->submissions;
 
   return $submissions;
 }
@@ -620,11 +581,8 @@ function webform_get_submissions($filters = array(), $header = NULL, $pager_coun
  *   An integer value of the number of submissions.
  */
 function webform_get_submission_count($nid, $uid = NULL, $reset = FALSE) {
-  $submission_count = 0;
-  if ($submission_controller = webform_get_submission_controller()) {
-    $submission_count = $submission_controller->getSubmissionCount($nid, $uid = NULL, $reset = FALSE);
-  }
-  return $submission_count;
+  $submission_controller = webform_get_submission_controller();
+  return $submission_controller->getSubmissionCount($nid, $uid = NULL, $reset = FALSE);
 }
 
 /**
@@ -783,11 +741,11 @@ function webform_get_submission_controller() {
   $plugins = ctools_get_plugins('webform', 'plugins');
   if (isset($plugins[$info['plugin']]) && $class = ctools_plugin_get_class($plugins[$info['plugin']], 'handler')) {
     $submission_controller = new $class();
+    return $submission_controller;
   }
   else {
-    $submission_controller = FALSE;
+    throw ErrorException('Unable to determine submission controller class.');
   }
-  return $submission_controller;
 }
 
 /**
@@ -805,19 +763,10 @@ function template_preprocess_webform_submission(&$vars) {
  */
 function template_preprocess_webform_submission_navigation(&$vars) {
   $start_path = ($vars['mode'] == 'print') ? 'print/' : 'node/';
+  $submission_controller = webform_get_submission_controller();
 
-  $previous_query = db_select('webform_submissions')
-    ->condition('nid', $vars['node']->nid)
-    ->condition('sid', $vars['submission']->sid, '<');
-  $previous_query->addExpression('MAX(sid)');
-
-  $next_query = db_select('webform_submissions')
-    ->condition('nid', $vars['node']->nid)
-    ->condition('sid', $vars['submission']->sid, '>');
-  $next_query->addExpression('MIN(sid)');
-
-  $vars['previous'] = $previous_query->execute()->fetchField();
-  $vars['next'] = $next_query->execute()->fetchField();
+  $vars['previous'] = $submission_controller->getPreviousSubmissionID($vars['node'], $vars['submission']);
+  $vars['next'] = $submission_controller->getNextSubmissionID($vars['node'], $vars['submission']);
   $vars['previous_url'] = $start_path . $vars['node']->nid . '/submission/' . $vars['previous'] . ($vars['mode'] == 'form' ? '/edit' : '');
   $vars['next_url'] = $start_path . $vars['node']->nid . '/submission/' . $vars['next'] . ($vars['mode'] == 'form' ? '/edit' : '');
 }
