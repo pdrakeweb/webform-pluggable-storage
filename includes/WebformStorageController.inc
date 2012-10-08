@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @file Defines the WebformStorageController class.
+ * @file Defines the WebformStorageController factory class.
  *
  */
 
