@@ -612,33 +612,9 @@ function _webform_analysis_select($component, $sids = array(), $single = FALSE) 
   $options = _webform_select_options($component, TRUE);
   $show_other_results = $single;
 
-  $sid_placeholders = count($sids) ? array_fill(0, count($sids), "'%s'") : array();
-  $sid_filter = count($sids) ? " AND sid IN (" . implode(",", $sid_placeholders) . ")" : "";
+  $submission_controller = webform_get_submission_controller('select_analysis');
+  $result = $submission_controller->getComponentSubmissionDataExtended($component, $sids, $show_other_results);
 
-  $option_operator = $show_other_results ? 'NOT IN' : 'IN';
-  $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->fields('wsd', array('data'))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid'])
-    ->condition('data', '', '<>')
-    ->condition('data', array_keys($options), $option_operator)
-    ->groupBy('data');
-  $query->addExpression('COUNT(data)', 'datacount');
-
-  if (count($sids)) {
-    $query->condition('sid', $sids, 'IN');
-  }
-
-  $count_query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid'])
-    ->condition('data', '', '<>');
-  $count_query->addExpression('COUNT(*)', 'datacount');
-  if (count($sids)) {
-    $count_query->condition('sid', $sids, 'IN');
-  }
-
-  $result = $query->execute();
   $rows = array();
   $normal_count = 0;
   foreach ($result as $data) {
@@ -656,7 +632,7 @@ function _webform_analysis_select($component, $sids = array(), $single = FALSE) 
 
     // Add a row for any unknown or user-entered values.
     if ($component['extra']['other_option']) {
-      $full_count = $count_query->execute()->fetchField();
+      $full_count = $result = $submission_controller->getComponentSubmissionDataCount($component, $sids);
       $other_count = $full_count - $normal_count;
       $display_option = !empty($component['extra']['other_text']) ? check_plain($component['extra']['other_text']) : t('Other...');
       $other_text = $other_count ? $other_count . ' (' . l(t('view'), 'node/' . $component['nid'] . '/webform-results/analysis/' . $component['cid']) . ')' : $other_count;

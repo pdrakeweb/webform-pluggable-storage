@@ -1393,8 +1393,8 @@ function webform_node_delete($node) {
   db_delete('webform_conditional_rules')->condition('nid', $node->nid)->execute();
   db_delete('webform_emails')->condition('nid', $node->nid)->execute();
   db_delete('webform_roles')->condition('nid', $node->nid)->execute();
-  db_delete('webform_submissions')->condition('nid', $node->nid)->execute();
-  db_delete('webform_submitted_data')->condition('nid', $node->nid)->execute();
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->deleteSubmissions($node);
   db_delete('webform_last_download')->condition('nid', $node->nid)->execute();
 }
 
@@ -3167,14 +3167,8 @@ function theme_webform_mail_headers($variables) {
  * Check if current user has a draft of this webform, and return the sid.
  */
 function _webform_fetch_draft_sid($nid, $uid) {
-  return db_select('webform_submissions')
-    ->fields('webform_submissions', array('sid'))
-    ->condition('nid', $nid)
-    ->condition('uid', $uid)
-    ->condition('is_draft', 1)
-    ->orderBy('submitted', 'DESC')
-    ->execute()
-    ->fetchField();
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getDraftSubmissionID($component, $sids, array('data'));
 }
 
 /**
@@ -4023,23 +4017,29 @@ function webform_ctools_plugin_type() {
 }
 
 /**
- * Implements hook_spaces_plugins().
+ * Implements hook_webform_plugins().
  */
 function webform_webform_plugins() {
   $plugins = array();
-  $plugins['webformSubmissionController'] = array(
+  $plugins['WebformSubmissionControllerMysql'] = array(
     'handler' => array(
       'path' => drupal_get_path('module', 'webform') .'/plugins',
-      'file' => 'webformSubmissionController.inc',
-      'class' => 'webformSubmissionController',
-      ),
+      'file' => 'WebformSubmissionControllerMysql.inc',
+      'class' => 'WebformSubmissionControllerMysql',
+    ),
   );
-  $plugins['webformSubmissionControllerMysql'] = array(
+  $plugins['WebformSubmissionControllerMysqlGridAnalysis'] = array(
     'handler' => array(
       'path' => drupal_get_path('module', 'webform') .'/plugins',
-      'file' => 'webformSubmissionControllerMysql.inc',
-      'class' => 'webformSubmissionControllerMysql',
-      'parent' => 'webformSubmissionController',
+      'file' => 'WebformSubmissionControllerMysqlGridAnalysis.inc',
+      'class' => 'WebformSubmissionControllerMysqlGridAnalysis',
+    ),
+  );
+  $plugins['WebformSubmissionControllerMysqlSelectAnalysis'] = array(
+    'handler' => array(
+      'path' => drupal_get_path('module', 'webform') .'/plugins',
+      'file' => 'WebformSubmissionControllerMysqlSelectAnalysis.inc',
+      'class' => 'WebformSubmissionControllerMysqlSelectAnalysis',
     ),
   );
   return $plugins;
@@ -4053,7 +4053,15 @@ function webform_webform_registry() {
     'controllers' => array(
       'submission' => array(
         'title' => t('MySQL'),
-        'plugin' => 'webformSubmissionControllerMysql',
+        'plugin' => 'WebformSubmissionControllerMysql',
+      ),
+      'grid_analysis' => array(
+        'title' => t('MySQL'),
+        'plugin' => 'WebformSubmissionControllerMysqlGridAnalysis',
+      ),
+      'select_analysis' => array(
+        'title' => t('MySQL'),
+        'plugin' => 'WebformSubmissionControllerMysqlSelectAnalysis',
       ),
     ),
   );

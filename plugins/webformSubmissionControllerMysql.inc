@@ -1,15 +1,14 @@
 <?php
 
 /**
- * @file Defines the webformSubmissionControllerMysql class.
+ * @file Defines the WebformSubmissionControllerMysql class.
  */
 
-class webformSubmissionControllerMysql extends webformSubmissionController {
+class WebformSubmissionControllerMysql implements WebformSubmissionController {
 
-  function __construct() {
-  }
+  public function getSubmissions($filters = array(), $header = NULL, $pager_count = 0) {
+    $submissions = array();
 
-  public function loadSubmissions($filters = array(), $header = NULL, $pager_count = 0) {
     if (!is_array($filters)) {
       $filters = array('nid' => $filters);
     }
@@ -65,13 +64,13 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
       $sids = array();
       foreach ($result as $row) {
         $sids[] = $row->sid;
-        $this->submissions[$row->sid] = FALSE;
+        $submissions[$row->sid] = FALSE;
       }
     }
 
     // If there are no submissions being retrieved, return an empty array.
     if (empty($sids)) {
-      return $this->submissions;
+      return $submissions;
     }
 
     // Query the required submission data.
@@ -99,30 +98,32 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
     $previous = 0;
     foreach ($result as $row) {
       if ($row->sid != $previous) {
-        $this->submissions[$row->sid] = new stdClass();
-        $this->submissions[$row->sid]->sid = $row->sid;
-        $this->submissions[$row->sid]->nid = $row->nid;
-        $this->submissions[$row->sid]->submitted = $row->submitted;
-        $this->submissions[$row->sid]->remote_addr = $row->remote_addr;
-        $this->submissions[$row->sid]->uid = $row->uid;
-        $this->submissions[$row->sid]->name = $row->name;
-        $this->submissions[$row->sid]->is_draft = $row->is_draft;
-        $this->submissions[$row->sid]->data = array();
+        $submissions[$row->sid] = new stdClass();
+        $submissions[$row->sid]->sid = $row->sid;
+        $submissions[$row->sid]->nid = $row->nid;
+        $submissions[$row->sid]->submitted = $row->submitted;
+        $submissions[$row->sid]->remote_addr = $row->remote_addr;
+        $submissions[$row->sid]->uid = $row->uid;
+        $submissions[$row->sid]->name = $row->name;
+        $submissions[$row->sid]->is_draft = $row->is_draft;
+        $submissions[$row->sid]->data = array();
       }
       // CID may be NULL if this submission does not actually contain any data.
       if ($row->cid) {
-        $this->submissions[$row->sid]->data[$row->cid][$row->no] = $row->data;
+        $submissions[$row->sid]->data[$row->cid][$row->no] = $row->data;
       }
       $previous = $row->sid;
     }
 
     foreach (module_implements('webform_submission_load') as $module) {
       $function = $module . '_webform_submission_load';
-      $function($this->submissions);
+      $function($submissions);
     }
+
+    return $submissions;
   }
 
-  public static function getSubmissionCount($nid, $uid = NULL, $reset = FALSE) {
+  public function getSubmissionCount($nid, $uid = NULL, $submission_interval = -1, $reset = FALSE) {
     static $counts;
 
     if (!isset($counts[$nid][$uid]) || $reset) {
@@ -131,10 +132,10 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
         ->condition('ws.nid', $nid)
         ->condition('ws.is_draft', 0);
       $arguments = array($nid);
-      if ($uid !== NULL) {
+      if (!empty($uid)) {
         $query->condition('ws.uid', $uid);
       }
-      if ($uid === 0) {
+      else {
         $submissions = isset($_SESSION['webform_submission']) ? $_SESSION['webform_submission'] : NULL;
         if ($submissions) {
           $query->condition('ws.sid', $submissions, 'IN');
@@ -145,6 +146,9 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
           $query->condition('ws.sid', 0);
         }
       }
+      if ($submission_interval != -1) {
+        $query->condition('submitted', REQUEST_TIME - $submission_interval, '>');
+      }
 
       $counts[$nid][$uid] = $query->countQuery()->execute()->fetchField();
     }
@@ -153,18 +157,7 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
 
   public function insertSubmission($node, $submission) {
     drupal_write_record('webform_submissions', $submission);
-    foreach ($submission->data as $cid => $values) {
-      foreach ($values as $delta => $value) {
-        $data = array(
-            'nid' => $node->webform['nid'],
-            'sid' => $submission->sid,
-            'cid' => $cid,
-            'no' => $delta,
-            'data' => is_null($value) ? '' : $value,
-        );
-        drupal_write_record('webform_submitted_data', $data);
-      }
-    }
+    $this->insertSubmissionData($node, $submission);
     return $submission;
   }
 
@@ -190,19 +183,39 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
     }
 
     // Then re-add submission data to the database.
-    $submission->is_new = FALSE;
-    webform_submission_insert($node, $submission);
+    $this->insertSubmissionData($node, $submission);
+    return $submission;
   }
 
-  public function deleteSubmission($node, $submission) {
-    db_delete('webform_submitted_data')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid)
-    ->execute();
-    db_delete('webform_submissions')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid)
-    ->execute();
+  protected function insertSubmissionData($node, $submission) {
+    foreach ($submission->data as $cid => $values) {
+      foreach ($values as $delta => $value) {
+        $data = array(
+            'nid' => $node->webform['nid'],
+            'sid' => $submission->sid,
+            'cid' => $cid,
+            'no' => $delta,
+            'data' => is_null($value) ? '' : $value,
+        );
+        drupal_write_record('webform_submitted_data', $data);
+      }
+    }
+  }
+
+  public function deleteSubmissions($node, $submission = FALSE) {
+    $data_delete = db_delete('webform_submitted_data')
+      ->condition('nid', $node->nid);
+    if ($submission != FALSE) {
+      $data_delete->condition('sid', $submission->sid);
+    }
+    $data_delete->execute();
+
+    $submission_delete = db_delete('webform_submissions')
+      ->condition('nid', $node->nid);
+    if ($submission != FALSE) {
+      $submission_delete->condition('sid', $submission->sid);
+    }
+    $submission_delete->execute();
   }
 
   public function getPreviousSubmissionID($node, $submission) {
@@ -254,4 +267,14 @@ class webformSubmissionControllerMysql extends webformSubmissionController {
     return ($query->execute()->fetchField() != 0);
   }
 
+  public function getDraftSubmissionID($nid, $uid) {
+    return db_select('webform_submissions')
+      ->fields('webform_submissions', array('sid'))
+      ->condition('nid', $nid)
+      ->condition('uid', $uid)
+      ->condition('is_draft', 1)
+      ->orderBy('submitted', 'DESC')
+      ->execute()
+      ->fetchField();
+  }
 }

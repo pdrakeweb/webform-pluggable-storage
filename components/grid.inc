@@ -298,21 +298,9 @@ function _webform_analysis_grid($component, $sids = array()) {
   $options = _webform_select_options_from_text($component['extra']['options'], TRUE);
   $questions = _webform_select_options_from_text($component['extra']['questions'], TRUE);
 
-  // Generate a lookup table of results.
-  $query = db_select('webform_submitted_data', 'wsd')
-    ->fields('wsd', array('no', 'data'))
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid'])
-    ->condition('data', '', '<>')
-    ->groupBy('no')
-    ->groupBy('data');
-  $query->addExpression('COUNT(sid)', 'datacount');
+  $submission_controller = webform_get_submission_controller('grid_analysis');
+  $result = $submission_controller->getComponentSubmissionData($component, $sids);
 
-  if (count($sids)) {
-    $query->condition('sid', $sids, 'IN');
-  }
-
-  $result = $query->execute();
   $counts = array();
   foreach ($result as $data) {
     $counts[$data->no][$data->data] = $data->datacount;

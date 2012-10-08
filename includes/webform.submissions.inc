@@ -82,11 +82,10 @@ function webform_submission_insert($node, $submission) {
       $function($node, $submission);
     }
     $submission->nid = $node->webform['nid'];
+    $submission_controller = webform_get_submission_controller();
+    $submission = $submission_controller->insertSubmission($node, $submission);
     $is_new = TRUE;
   }
-
-  $submission_controller = webform_get_submission_controller();
-  $submission = $submission_controller->insertSubmission($node, $submission);
 
   // Invoke the insert hook after saving all the data.
   if (isset($is_new)) {
@@ -102,7 +101,7 @@ function webform_submission_insert($node, $submission) {
  * @param $nid
  *   ID of node for which this webform was submitted.
  * @param $sid
- *   ID of submission to be deleted (from webform_submitted_data).
+ *   ID of submission to be deleted.
  */
 function webform_submission_delete($node, $submission) {
   // Iterate through all components and let each do cleanup if necessary.
@@ -118,7 +117,7 @@ function webform_submission_delete($node, $submission) {
   }
 
   $submission_controller = webform_get_submission_controller();
-  $submission = $submission_controller->deleteSubmission($node, $submission);
+  $submission = $submission_controller->deleteSubmissions($node, $submission);
 
   module_invoke_all('webform_submission_delete', $node, $submission);
 }
@@ -281,7 +280,7 @@ function webform_submission_send_mail($node, $submission, $emails = NULL) {
  * @param $node
  *   The node for which this webform was submitted.
  * @param $submission
- *   The submission to be deleted (from webform_submitted_data).
+ *   The submission to be deleted.
  */
 function webform_submission_delete_form($form, $form_state, $node, $submission) {
   webform_set_breadcrumb($node, $submission);
@@ -561,13 +560,8 @@ function webform_submission_render($node, $submission, $email, $format) {
  *   Optional. The number of submissions to include in the results.
  */
 function webform_get_submissions($filters = array(), $header = NULL, $pager_count = 0) {
-  $submissions = array();
-
   $submission_controller = webform_get_submission_controller();
-  $submission_controller->loadSubmissions($filters, $header, $pager_count);
-  $submissions = $submission_controller->submissions;
-
-  return $submissions;
+  return $submission_controller->getSubmissions($filters, $header, $pager_count);
 }
 
 /**
@@ -582,7 +576,7 @@ function webform_get_submissions($filters = array(), $header = NULL, $pager_coun
  */
 function webform_get_submission_count($nid, $uid = NULL, $reset = FALSE) {
   $submission_controller = webform_get_submission_controller();
-  return $submission_controller->getSubmissionCount($nid, $uid = NULL, $reset = FALSE);
+  return $submission_controller->getSubmissionCount($nid, $uid, $submission_interval = -1, $reset);
 }
 
 /**
@@ -647,23 +641,8 @@ function webform_submission_user_limit_check($node, $account = NULL) {
   }
 
   // Retrieve submission data for this IP address or username from the database.
-  $query = db_select('webform_submissions')
-    ->condition('nid', $node->nid)
-    ->condition('is_draft', 0);
-
-  if ($node->webform['submit_interval'] != -1) {
-    $query->condition('submitted', REQUEST_TIME - $node->webform['submit_interval'], '>');
-  }
-
-  if ($account->uid) {
-    $query->condition('uid', $account->uid);
-  }
-  else {
-    $query->condition('remote_addr', ip_address());
-  }
-
-  // Fetch all the entries from the database within the submit interval with this username and IP.
-  $num_submissions_database = $query->countQuery()->execute()->fetchField();
+  $submission_controller = webform_get_submission_controller();
+  $num_submissions_database = $submission_controller->getSubmissionCount($node->nid, $account->uid, $node->webform['submit_interval']);
 
   // Double check the submission history from the users machine using cookies.
   $num_submissions_cookie = 0;
@@ -734,18 +713,8 @@ function webform_submission_total_limit_check($node) {
 /**
  * Obtain a submission controller object.
  */
-function webform_get_submission_controller() {
-  ctools_include('plugins');
-  $registry = webform_controllers();
-  $info = $registry['submission'];
-  $plugins = ctools_get_plugins('webform', 'plugins');
-  if (isset($plugins[$info['plugin']]) && $class = ctools_plugin_get_class($plugins[$info['plugin']], 'handler')) {
-    $submission_controller = new $class();
-    return $submission_controller;
-  }
-  else {
-    throw new ErrorException('Unable to determine submission controller class.');
-  }
+function webform_get_submission_controller($context = 'submission') {
+  return WebformStorageController::getInstance($context);
 }
 
 /**
