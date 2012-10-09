@@ -81,7 +81,7 @@ function webform_submission_insert($node, $submission) {
       $function = $module . '_webform_submission_presave';
       $function($node, $submission);
     }
-    $submission->nid = $node->webform['nid'];
+    $submission->nid = (int) $node->webform['nid'];
     $submission_controller = webform_get_submission_controller();
     $submission = $submission_controller->insertSubmission($node, $submission);
     $is_new = TRUE;

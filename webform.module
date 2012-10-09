@@ -2741,8 +2741,8 @@ function webform_client_form_submit($form, &$form_state) {
   if (!$sid) {
     // Create a new submission object.
     $submission = (object) array(
-      'nid' => $node->nid,
-      'uid' => $form_state['values']['details']['uid'],
+      'nid' => (int) $node->nid,
+      'uid' => (int) $form_state['values']['details']['uid'],
       'submitted' => REQUEST_TIME,
       'remote_addr' => ip_address(),
       'is_draft' => $is_draft,
