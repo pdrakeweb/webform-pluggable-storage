@@ -711,13 +711,6 @@ function webform_submission_total_limit_check($node) {
 }
 
 /**
- * Obtain a submission controller object.
- */
-function webform_get_submission_controller($context = 'submission') {
-  return WebformStorageController::getInstance($context);
-}
-
-/**
  * Preprocess function for webform-submission.tpl.php.
  */
 function template_preprocess_webform_submission(&$vars) {

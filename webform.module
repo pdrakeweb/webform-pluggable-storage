@@ -4075,6 +4075,13 @@ function webform_controllers($reset = FALSE) {
 }
 
 /**
+ * Obtain a submission controller object.
+ */
+function webform_get_submission_controller($context = 'submission') {
+  return WebformStorageController::getInstance($context);
+}
+
+/**
  * Registry retrieval and caching.
  */
 function _webform_registry($key = NULL, $reset = FALSE) {
