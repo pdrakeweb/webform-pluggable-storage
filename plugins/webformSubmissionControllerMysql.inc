@@ -249,7 +249,7 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
 
   public function deleteComponentSubmissionData($component) {
     db_delete('webform_submitted_data')
-    ->condition('nid', $node->nid)
+    ->condition('nid', $component['nid'])
     ->condition('cid', $component['cid'])
     ->execute();
   }
