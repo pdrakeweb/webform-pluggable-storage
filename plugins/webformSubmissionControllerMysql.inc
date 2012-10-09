@@ -6,6 +6,8 @@
 
 class WebformSubmissionControllerMysql implements WebformSubmissionController {
 
+  public $controller_type = 'db';
+
   public function getSubmissions($filters = array(), $header = NULL, $pager_count = 0) {
     $submissions = array();
 
