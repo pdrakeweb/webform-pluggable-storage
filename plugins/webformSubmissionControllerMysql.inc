@@ -260,13 +260,13 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
     $query = db_select('webform_submitted_data')
       ->fields('webform_submitted_data', array('sid'))
       ->condition('nid', $nid)
-      ->condition('cid', $element['#webform_component']['cid'])
-      ->condition('data', $element['#value'])
+      ->condition('cid', $cid)
+      ->condition('data', $value)
       ->range(0, 1); // More efficient than using countQuery() for data checks.
     if ($sid) {
       $query->condition('sid', $sid, '<>');
     }
-    return ($query->execute()->fetchField() != 0);
+    return ($query->execute()->fetchField() == 0);
   }
 
   public function getDraftSubmissionID($nid, $uid) {
