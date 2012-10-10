@@ -193,11 +193,11 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
     foreach ($submission->data as $cid => $values) {
       foreach ($values as $delta => $value) {
         $data = array(
-            'nid' => $node->webform['nid'],
-            'sid' => $submission->sid,
-            'cid' => $cid,
-            'no' => $delta,
-            'data' => is_null($value) ? '' : $value,
+          'nid' => $node->webform['nid'],
+          'sid' => $submission->sid,
+          'cid' => $cid,
+          'no' => $delta,
+          'data' => is_null($value) ? '' : $value,
         );
         drupal_write_record('webform_submitted_data', $data);
       }
@@ -222,25 +222,25 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
 
   public function getPreviousSubmissionID($node, $submission) {
     $previous_query = db_select('webform_submissions')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid, '<');
+      ->condition('nid', $node->nid)
+      ->condition('sid', $submission->sid, '<');
     $previous_query->addExpression('MAX(sid)');
     return $previous_query->execute()->fetchField();
   }
 
   public function getNextSubmissionID($node, $submission) {
     $next_query = db_select('webform_submissions')
-    ->condition('nid', $node->nid)
-    ->condition('sid', $submission->sid, '<');
+      ->condition('nid', $node->nid)
+      ->condition('sid', $submission->sid, '<');
     $next_query->addExpression('MIN(sid)');
     return $next_query->execute()->fetchField();
   }
 
   public function getComponentSubmissionData($component, $sids = array(), $fields = array('no', 'data')) {
     $query = db_select('webform_submitted_data', 'wsd', array('fetch' => PDO::FETCH_ASSOC))
-    ->fields('wsd', $fields)
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid']);
+      ->fields('wsd', $fields)
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid']);
 
     if (count($sids)) {
       $query->condition('sid', $sids, 'IN');
@@ -251,9 +251,9 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
 
   public function deleteComponentSubmissionData($component) {
     db_delete('webform_submitted_data')
-    ->condition('nid', $component['nid'])
-    ->condition('cid', $component['cid'])
-    ->execute();
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid'])
+      ->execute();
   }
 
   public function validateComponentSubmissionUnique($nid, $cid, $value, $sid = FALSE) {
