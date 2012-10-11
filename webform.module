@@ -483,6 +483,7 @@ function webform_init() {
       _admin_init_theme();
     }
   }
+  webform_include();
 }
 
 /**
@@ -3837,4 +3838,17 @@ function _webform_registry($key = NULL, $reset = FALSE) {
     return isset($registry[$key]) ? $registry[$key] : array();
   }
   return $registry;
+}
+
+/**
+ * Helper. Make sure expensive module_load_include() does not run needlessly.
+ */
+function webform_include() {
+  static $included = FALSE;
+  if (!$included) {
+    module_load_include('inc', 'webform', 'includes/WebformStorageController');
+    module_load_include('inc', 'webform', 'includes/WebformSubmissionController');
+    module_invoke_all('webform_load_classes');
+    $included = TRUE;
+  }
 }

@@ -336,10 +336,10 @@ function _webform_analysis_time($component, $sids = array()) {
 
   $times = array();
   $submissions = 0;
-  foreach($result as $row) {
+  foreach($result as $data) {
     $submissions++;
-    if ($row['data']) {
-      $times[] = webform_date_array($row['data']);
+    if ($data['data']) {
+      $times[] = webform_date_array($data['data']);
     }
   }
 

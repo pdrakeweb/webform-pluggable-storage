@@ -371,8 +371,8 @@ function _webform_analysis_date($component, $sids = array()) {
   $submissions = 0;
   foreach ($result as $data) {
     $submissions++;
-    if ($row['data']) {
-      $dates[] = webform_date_array($row['data']);
+    if ($data['data']) {
+      $dates[] = webform_date_array($data['data']);
     }
   }
 
