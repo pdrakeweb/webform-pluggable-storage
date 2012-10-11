@@ -202,18 +202,14 @@ function theme_webform_display_textfield($element) {
  * Implements _webform_analysis_component().
  */
 function _webform_analysis_textfield($component, $sids = array()) {
-  $placeholders = count($sids) ? array_fill(0, count($sids), "'%s'") : array();
-  $sidfilter = count($sids) ? " AND sid in (" . implode(",", $placeholders) . ")" : "";
-  $query = 'SELECT data ' .
-    ' FROM {webform_submitted_data} ' .
-    ' WHERE nid = %d ' .
-    ' AND cid = %d ' . $sidfilter;
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids, array('data'));
+
   $nonblanks = 0;
   $submissions = 0;
   $wordcount = 0;
 
-  $result = db_query($query, array_merge(array($component['nid'], $component['cid']), $sids));
-  while ($data = db_fetch_array($result)) {
+  foreach ($result as $data) {
     if (drupal_strlen(trim($data['data'])) > 0) {
       $nonblanks++;
       $wordcount += str_word_count(trim($data['data']));

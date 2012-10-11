@@ -55,26 +55,8 @@ function webform_submission_update($node, $submission) {
     $function($node, $submission);
   }
 
-  // Update the main submission info.
-  drupal_write_record('webform_submissions', $submission, 'sid');
-
-  // If is draft, only delete data for components submitted, to
-  // preserve any data from form pages not visited in this submission.
-  if ($submission->is_draft) {
-    $submitted_cids = array_keys($submission->data);
-    if ($submitted_cids) {
-      $placeholders = db_placeholders($submitted_cids);
-      $arguments = array_merge(array($submission->sid), $submitted_cids);
-      db_query("DELETE FROM {webform_submitted_data} WHERE sid = %d AND cid IN (" . $placeholders . ")", $arguments);
-    }
-  }
-  else {
-    db_query("DELETE FROM {webform_submitted_data} WHERE sid = %d", $submission->sid);
-  }
-
-  // Then re-add submission data to the database.
-  $submission->is_new = FALSE;
-  webform_submission_insert($node, $submission);
+  $submission_controller = webform_get_submission_controller();
+  $submission = $submission_controller->updateSubmission($node, $submission);
 
   module_invoke_all('webform_submission_update', $node, $submission);
 
@@ -100,22 +82,10 @@ function webform_submission_insert($node, $submission) {
       $function($node, $submission);
     }
 
-    $submission->nid = $node->webform['nid'];
-    drupal_write_record('webform_submissions', $submission);
+    $submission->nid = (int) $node->webform['nid'];
+    $submission_controller = webform_get_submission_controller();
+    $submission = $submission_controller->insertSubmission($node, $submission);
     $is_new = TRUE;
-  }
-
-  foreach ($submission->data as $cid => $values) {
-    foreach ($values['value'] as $delta => $value) {
-      $data = array(
-        'nid' => $node->webform['nid'],
-        'sid' => $submission->sid,
-        'cid' => $cid,
-        'no' => $delta,
-        'data' => is_null($value) ? '' : $value,
-      );
-      drupal_write_record('webform_submitted_data', $data);
-    }
   }
 
   // Invoke the insert hook after saving all the data.
@@ -132,7 +102,7 @@ function webform_submission_insert($node, $submission) {
  * @param $nid
  *   ID of node for which this webform was submitted.
  * @param $sid
- *   ID of submission to be deleted (from webform_submitted_data).
+ *   ID of submission to be deleted.
  */
 function webform_submission_delete($node, $submission) {
   // Iterate through all components and let each do cleanup if necessary.
@@ -147,8 +117,8 @@ function webform_submission_delete($node, $submission) {
     unset($_SESSION['webform_submission'][$submission->sid]);
   }
 
-  db_query('DELETE FROM {webform_submitted_data} WHERE nid = %d AND sid = %d', $node->nid, $submission->sid);
-  db_query('DELETE FROM {webform_submissions} WHERE nid = %d AND sid = %d', $node->nid, $submission->sid);
+  $submission_controller = webform_get_submission_controller();
+  $submission = $submission_controller->deleteSubmissions($node, $submission);
 
   module_invoke_all('webform_submission_delete', $node, $submission);
 }
@@ -311,7 +281,7 @@ function webform_submission_send_mail($node, $submission, $emails = NULL) {
  * @param $node
  *   The node for which this webform was submitted.
  * @param $submission
- *   The submission to be deleted (from webform_submitted_data).
+ *   The submission to be deleted.
  */
 function webform_submission_delete_form($form_state, $node, $submission) {
   webform_set_breadcrumb($node, $submission);
@@ -582,120 +552,8 @@ function webform_submission_render($node, $submission, $email, $format) {
  *   Optional. The number of submissions to include in the results.
  */
 function webform_get_submissions($filters = array(), $header = NULL, $pager_count = 0) {
-  $submissions = array();
-
-  if (!is_array($filters)) {
-    $filters = array('nid' => $filters);
-  }
-
-  // UID filters need to be against a specific table.
-  if (isset($filters['uid'])) {
-    $filters['u.uid'] = $filters['uid'];
-    unset($filters['uid']);
-  }
-
-  // No need to find SIDs if it was given to us.
-  if (isset($filters['sid'])) {
-    if(is_array($filters['sid'])){
-      $sids = $filters['sid'];
-    }
-    else{
-      $sids = array($filters['sid']);
-    }
-  }
-  // Build the list of SIDs that need to be retrieved.
-  else {
-    $arguments = array_values($filters);
-    $where = array();
-    foreach ($filters as $column => $value) {
-      $where[] = $column . ' = ' . (is_numeric($value) ? '%d' : "'%s'");
-    }
-
-    if (isset($filters['u.uid']) && $filters['u.uid'] === 0) {
-      if (!empty($_SESSION['webform_submission'])) {
-        $anonymous_sids = array_keys($_SESSION['webform_submission']);
-        $where[] = 'sid IN (' . db_placeholders($anonymous_sids) . ')';
-        $arguments = array_merge($arguments, $anonymous_sids);
-      }
-      else {
-        $where[] = 'sid = 0';
-      }
-    }
-
-    $where_clause = implode(' AND ', $where);
-    $pager_query = 'SELECT sid FROM {webform_submissions} s LEFT JOIN {users} u ON u.uid = s.uid WHERE ' . $where_clause;
-
-    if (is_array($header)) {
-      $pager_query .= tablesort_sql($header);
-    }
-    else {
-      $pager_query .= ' ORDER BY sid ASC';
-    }
-
-    if ($pager_count) {
-      $result = pager_query($pager_query, $pager_count, 0, NULL, $arguments);
-    }
-    else {
-      $result = db_query($pager_query, $arguments);
-    }
-
-    $sids = array();
-    while ($row = db_fetch_object($result)) {
-      $sids[] = $row->sid;
-      $submissions[$row->sid] = FALSE;
-    }
-  }
-
-  // If there are no submissions being retrieved, return an empty array.
-  if (empty($sids)) {
-    return $submissions;
-  }
-
-  // Query the required submission data.
-  $query = 'SELECT s.*, sd.cid, sd.no, sd.data, u.name, u.mail, u.status ' .
-           'FROM {webform_submitted_data} sd ' .
-           'LEFT JOIN {webform_submissions} s ON s.sid = sd.sid ' .
-           'LEFT JOIN {users} u ON u.uid = s.uid ' .
-           'WHERE sd.sid IN (' . db_placeholders($sids) . ') ' .
-           // By adding the NID to this query we allow MySQL to use the primary
-           // key in webform_submitted_data for sorting (nid_sid_cid_no).
-           (isset($filters['nid']) ? 'AND sd.nid = %d ' : '') .
-           'ORDER BY sd.sid ASC, sd.cid ASC, sd.no ASC';
-
-  $args = $sids;
-  if (isset($filters['nid'])) {
-    $args[] = $filters['nid'];
-  }
-
-  $result = db_query($query, $args);
-
-  // Convert the queried rows into submissions.
-  $previous = array();
-  while ($row = db_fetch_object($result)) {
-    if ($row->sid != $previous) {
-      $submissions[$row->sid] = new stdClass();
-      $submissions[$row->sid]->sid = $row->sid;
-      $submissions[$row->sid]->nid = $row->nid;
-      $submissions[$row->sid]->submitted = $row->submitted;
-      $submissions[$row->sid]->remote_addr = $row->remote_addr;
-      $submissions[$row->sid]->uid = $row->uid;
-      $submissions[$row->sid]->name = $row->name;
-      $submissions[$row->sid]->is_draft = $row->is_draft;
-      $submissions[$row->sid]->data = array();
-    }
-    // CID may be NULL if this submission does not actually contain any data.
-    if ($row->cid) {
-      $submissions[$row->sid]->data[$row->cid]['value'][$row->no] = $row->data;
-    }
-    $previous = $row->sid;
-  }
-
-  foreach (module_implements('webform_submission_load') as $module) {
-    $function = $module . '_webform_submission_load';
-    $function($submissions);
-  }
-
-  return $submissions;
+  $submission_controller = webform_get_submission_controller();
+  return $submission_controller->getSubmissions($filters, $header, $pager_count);
 }
 
 /**
@@ -709,24 +567,8 @@ function webform_get_submissions($filters = array(), $header = NULL, $pager_coun
  *   An integer value of the number of submissions.
  */
 function webform_get_submission_count($nid, $uid = NULL, $reset = FALSE) {
-  static $counts;
-
-  if (!isset($counts[$nid][$uid]) || $reset) {
-    $query = 'SELECT count(*) FROM {webform_submissions} WHERE nid = %d AND is_draft = 0';
-    $arguments = array($nid);
-    if ($uid !== NULL) {
-      $query .= ' AND uid = %d';
-      $arguments[] = $uid;
-    }
-    if ($uid === 0) {
-      $submissions = isset($_SESSION['webform_submission']) ? $_SESSION['webform_submission'] : array();
-      $query .= count($submissions) ? ' AND sid IN (' . db_placeholders($submissions) . ')' : ' AND sid = 0';
-      $arguments = array_merge($arguments, array_keys($submissions));
-    }
-
-    $counts[$nid][$uid] = db_result(db_query($query, $arguments));
-  }
-  return $counts[$nid][$uid];
+  $submission_controller = webform_get_submission_controller();
+  return $submission_controller->getSubmissionCount($nid, $uid, $submission_interval = -1, $reset);
 }
 
 /**
@@ -776,16 +618,10 @@ function _webform_submission_user_limit_check($node) {
     return FALSE; // No check enabled.
   }
 
-  // Retrieve submission data for this IP address or username from the database.
-  $query = 'SELECT count(*) ' .
-           'FROM {webform_submissions} ' .
-           "WHERE (( 0 = %d AND remote_addr = '%s') OR (uid > 0 AND uid = %d)) " .
-           'AND submitted > %d AND nid = %d AND is_draft = 0';
+  $submission_controller = webform_get_submission_controller();
+  $num_submissions_database = $submission_controller->getSubmissionCount($node->nid, $user->uid, $node->webform['submit_interval']);
 
-  // Fetch all the entries from the database within the submit interval with this username and IP.
-  $num_submissions_database = db_result(db_query($query, $user->uid, ip_address(), $user->uid, ($node->webform['submit_interval'] != -1) ? (time() - $node->webform['submit_interval']) : $node->webform['submit_interval'], $node->nid));
-
-  // Double check the submission history from the users machine using cookies.
+// Double check the submission history from the users machine using cookies.
   $num_submissions_cookie = 0;
   if ($user->uid == 0 && variable_get('webform_use_cookies', 0)) {
     $cookie_name = 'webform-' . $node->nid;
@@ -862,8 +698,11 @@ function template_preprocess_webform_submission(&$vars) {
  */
 function template_preprocess_webform_submission_navigation(&$vars) {
   $start_path = ($vars['mode'] == 'print') ? 'print/' : 'node/';
-  $vars['previous'] = db_result(db_query('SELECT MAX(sid) FROM {webform_submissions} WHERE nid = %d AND sid < %d', array($vars['node']->nid, $vars['submission']->sid)));
-  $vars['next'] = db_result(db_query('SELECT MIN(sid) FROM {webform_submissions} WHERE nid = %d AND sid > %d', array($vars['node']->nid, $vars['submission']->sid)));
+  $submission_controller = webform_get_submission_controller();
+
+  $vars['previous'] = $submission_controller->getPreviousSubmissionID($vars['node'], $vars['submission']);
+  $vars['next'] = $submission_controller->getNextSubmissionID($vars['node'], $vars['submission']);
+
   $vars['previous_url'] = $start_path . $vars['node']->nid . '/submission/' . $vars['previous'] . ($vars['mode'] == 'form' ? '/edit' : '');
   $vars['next_url'] = $start_path . $vars['node']->nid . '/submission/' . $vars['next'] . ($vars['mode'] == 'form' ? '/edit' : '');
 }

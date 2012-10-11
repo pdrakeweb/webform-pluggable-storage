@@ -640,29 +640,12 @@ function _webform_analysis_select($component, $sids = array(), $single = FALSE) 
   $options = _webform_select_options($component, TRUE);
   $show_other_results = $single;
 
-  $sid_placeholders = count($sids) ? array_fill(0, count($sids), "'%s'") : array();
-  $sid_filter = count($sids) ? " AND sid IN (" . implode(",", $sid_placeholders) . ")" : "";
+  $submission_controller = webform_get_submission_controller('select_analysis');
+  $result = $submission_controller->getComponentSubmissionDataExtended($component, $sids, $show_other_results);
 
-  $option_operator = $show_other_results ? 'NOT IN' : 'IN';
-  $placeholders = count($options) ? array_fill(0, count($options), "'%s'") : array();
-  $query = 'SELECT data, count(data) as datacount ' .
-    ' FROM {webform_submitted_data} ' .
-    ' WHERE nid = %d ' .
-    ' AND cid = %d ' .
-    " AND data != ''" . $sid_filter .
-    ($placeholders ? ' AND data ' . $option_operator . ' (' . implode(',', $placeholders) . ')' : '') .
-    ' GROUP BY data ';
-
-  $count_query = 'SELECT count(*) as datacount ' .
-    ' FROM {webform_submitted_data} ' .
-    ' WHERE nid = %d ' .
-    ' AND cid = %d ' .
-    " AND data != ''" . $sid_filter;
-
-  $result = db_query($query, array_merge(array($component['nid'], $component['cid']), $sids, array_keys($options)));
   $rows = array();
   $normal_count = 0;
-  while ($data = db_fetch_array($result)) {
+  foreach ($result as $data) {
     $display_option = $single ? $data['data'] : $options[$data['data']];
     $rows[$data['data']] = array(_webform_filter_xss($display_option), $data['datacount']);
     $normal_count += $data['datacount'];
@@ -677,7 +660,7 @@ function _webform_analysis_select($component, $sids = array(), $single = FALSE) 
 
     // Add a row for any unknown or user-entered values.
     if ($component['extra']['other_option']) {
-      $full_count = db_result(db_query($count_query, array_merge(array($component['nid'], $component['cid']), $sids)));
+      $full_count = $submission_controller->getComponentSubmissionDataCount($component, $sids);
       $other_count = $full_count - $normal_count;
       $display_option = !empty($component['extra']['other_text']) ? check_plain($component['extra']['other_text']) : t('Other...');
       $other_text = $other_count ? $other_count . ' (' . l(t('view'), 'node/' . $component['nid'] . '/webform-results/analysis/' . $component['cid']) . ')' : $other_count;

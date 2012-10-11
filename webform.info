@@ -4,3 +4,12 @@ description = Enables the creation of forms and questionnaires.
 core = 6.x
 package = Webform
 php = 5.1
+
+files[] = includes/WebformSubmissionController.inc
+files[] = includes/WebformStorageController.inc
+
+files[] = plugins/WebformSubmissionControllerMysql.inc
+files[] = plugins/WebformSubmissionControllerMysqlGridAnalysis.inc
+files[] = plugins/WebformSubmissionControllerMysqlSelectAnalysis.inc
+
+dependencies[] = "ctools"

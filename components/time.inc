@@ -331,19 +331,12 @@ function theme_webform_display_time($element) {
  * Implements _webform_analysis_component().
  */
 function _webform_analysis_time($component, $sids = array()) {
-  $placeholders = count($sids) ? array_fill(0, count($sids), "'%s'") : array();
-  $sidfilter = count($sids) ? " AND sid in (" . implode(",", $placeholders) . ")" : "";
-  $query = 'SELECT no,data ' .
-    ' FROM {webform_submitted_data} ' .
-    ' WHERE nid = %d ' .
-    ' AND  cid = %d ' . $sidfilter .
-    ' ORDER BY sid ASC ';
-
-  $result = db_query($query, array_merge(array($component['nid'], $component['cid']), $sids));
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids);
 
   $times = array();
   $submissions = 0;
-  while ($row = db_fetch_array($result)) {
+  foreach($result as $row) {
     $submissions++;
     if ($row['data']) {
       $times[] = webform_date_array($row['data']);

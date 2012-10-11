@@ -365,12 +365,8 @@ function theme_webform_display_number($element) {
 function _webform_analysis_number($component, $sids = array(), $single = FALSE) {
   $advanced_stats = $single;
 
-  $placeholders = count($sids) ? array_fill(0, count($sids), "'%s'") : array();
-  $sidfilter = count($sids) ? " AND sid in (" . implode(",", $placeholders) . ")" : "";
-  $query = 'SELECT data ' .
-    ' FROM {webform_submitted_data} ' .
-    ' WHERE nid = %d ' .
-    ' AND cid = %d ' . $sidfilter;
+  $submission_controller = webform_get_submission_controller();
+  $result = $submission_controller->getComponentSubmissionData($component, $sids, array('data'));
 
   $population = array();
   $submissions = 0;
@@ -378,8 +374,7 @@ function _webform_analysis_number($component, $sids = array(), $single = FALSE) 
   $not_empty = 0;
   $sum = 0;
 
-  $result = db_query($query, array_merge(array($component['nid'], $component['cid']), $sids));
-  while ($data = db_fetch_array($result)) {
+  foreach ($result as $data) {
     $value = trim($data['data']);
     if ($value == '') {
       $number = 0.0;
