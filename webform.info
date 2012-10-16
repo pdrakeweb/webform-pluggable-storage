@@ -8,6 +8,7 @@ configure = admin/config/content/webform
 ; Files that contain classes:
 files[] = includes/webform.export.inc
 files[] = includes/WebformSubmissionController.inc
+files[] = includes/WebformSubmissionAnalysisController.inc
 files[] = includes/WebformStorageController.inc
 
 files[] = plugins/WebformSubmissionControllerMysql.inc

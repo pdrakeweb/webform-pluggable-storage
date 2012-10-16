@@ -4,7 +4,7 @@
  * @file Defines the WebformSubmissionControllerMysql class.
  */
 
-class WebformSubmissionControllerMysql implements WebformSubmissionController {
+class WebformSubmissionControllerMysql implements WebformSubmissionController, WebformSubmissionAnalysisController {
 
   public $controller_type = 'db';
 
@@ -279,4 +279,68 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
       ->execute()
       ->fetchField();
   }
+
+  public function getComponentSubmissionMin($component, $sids = array()) {
+    $query = db_select('webform_submitted_data', 'wsd')
+      ->addExpression('MIN(*)', 'value')
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid']);
+
+    if (count($sids)) {
+      $query->condition('sid', $sids, 'IN');
+    }
+
+    return $query->execute()->fetchField();
+  }
+
+  public function getComponentSubmissionMax($component) {
+    $query = db_select('webform_submitted_data', 'wsd')
+      ->addExpression('MAX(*)', 'value')
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid']);
+
+    if (count($sids)) {
+      $query->condition('sid', $sids, 'IN');
+    }
+
+    return $query->execute()->fetchField();
+  }
+
+  public function getComponentSubmissionAvg($component) {
+    $query = db_select('webform_submitted_data', 'wsd')
+      ->addExpression('AVG(*)', 'value')
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid']);
+
+    if (count($sids)) {
+      $query->condition('sid', $sids, 'IN');
+    }
+
+    return $query->execute()->fetchField();
+  }
+
+  public function getComponentSubmissionCount($component, $count_type = 'all') {
+    $query = db_select('webform_submitted_data', 'wsd')
+      ->addExpression('COUNT(*)', 'value')
+      ->condition('nid', $component['nid'])
+      ->condition('cid', $component['cid']);
+
+    switch($count_type) {
+      case 'empty':
+        $query->condition('data', '', '=');
+        break;
+
+      case 'notempty':
+        $query->condition('data', '', '!=');
+        break;
+    }
+
+
+    if (count($sids)) {
+      $query->condition('sid', $sids, 'IN');
+    }
+
+    return $query->execute()->fetchField();
+  }
+
 }
