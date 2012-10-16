@@ -3847,6 +3847,7 @@ function webform_include() {
   static $included = FALSE;
   if (!$included) {
     module_load_include('inc', 'webform', 'includes/WebformStorageController');
+    module_load_include('inc', 'webform', 'includes/WebformSubmissionAnalysisController');
     module_load_include('inc', 'webform', 'includes/WebformSubmissionController');
     module_invoke_all('webform_load_classes');
     $included = TRUE;

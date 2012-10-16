@@ -6,6 +6,7 @@ package = Webform
 php = 5.1
 
 files[] = includes/WebformSubmissionController.inc
+files[] = includes/WebformSubmissionAnalysisController.inc
 files[] = includes/WebformStorageController.inc
 
 files[] = plugins/WebformSubmissionControllerMysql.inc

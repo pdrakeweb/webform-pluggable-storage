@@ -4,7 +4,7 @@
  * @file Defines the WebformSubmissionControllerMysql class.
  */
 
-class WebformSubmissionControllerMysql implements WebformSubmissionController {
+class WebformSubmissionControllerMysql implements WebformSubmissionController, WebformSubmissionAnalysisController {
 
   public $controller_type = 'db';
 
@@ -239,4 +239,35 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController {
     }
     return FALSE;
   }
+
+  public function getComponentSubmissionMin($component) {
+    return db_result(db_query('SELECT MIN(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+  }
+
+  public function getComponentSubmissionMax($component) {
+    return db_result(db_query('SELECT MAX(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+  }
+
+  public function getComponentSubmissionAvg($component) {
+    return db_result(db_query('SELECT AVG(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+  }
+
+  public function getComponentSubmissionCount($component, $count_type = 'all') {
+    switch($count_type) {
+      case 'empty':
+        $count_type_sql = ' AND wsd.data = ""';
+        break;
+
+      case 'notempty':
+        $count_type_sql = ' AND wsd.data != ""';
+        break;
+
+      default:
+      case 'all':
+        $count_type_sql = '';
+        break;
+    }
+    return db_result(db_query('SELECT COUNT(*) FROM {webform_submitted_data} wsd WHERE wsd.cid = %d' . $count_type_sql, $component['cid']));
+  }
+
 }
