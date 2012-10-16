@@ -117,7 +117,7 @@ function webform_submission_delete($node, $submission) {
   }
 
   $submission_controller = webform_get_submission_controller();
-  $submission = $submission_controller->deleteSubmissions($node, $submission);
+  $submission_controller->deleteSubmissions($node, $submission);
 
   module_invoke_all('webform_submission_delete', $node, $submission);
 }
