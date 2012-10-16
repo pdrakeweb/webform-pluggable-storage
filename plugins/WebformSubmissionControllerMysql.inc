@@ -241,15 +241,15 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
   }
 
   public function getComponentSubmissionMin($component) {
-    return db_result(db_query('SELECT MIN(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+    return db_result(db_query('SELECT MIN(data) FROM {webform_submitted_data} WHERE nid = %d AND cid = %d', $component['nid'], $component['cid']));
   }
 
   public function getComponentSubmissionMax($component) {
-    return db_result(db_query('SELECT MAX(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+    return db_result(db_query('SELECT MAX(data) FROM {webform_submitted_data} WHERE nid = %d AND cid = %d', $component['nid'], $component['cid']));
   }
 
   public function getComponentSubmissionAvg($component) {
-    return db_result(db_query('SELECT AVG(data) FROM {webform_submitted_data} WHERE cid = %d', $component['cid']));
+    return db_result(db_query('SELECT AVG(data) FROM {webform_submitted_data} WHERE nid = %d AND cid = %d', $component['nid'], $component['cid']));
   }
 
   public function getComponentSubmissionCount($component, $count_type = 'all') {
@@ -267,7 +267,7 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
         $count_type_sql = '';
         break;
     }
-    return db_result(db_query('SELECT COUNT(*) FROM {webform_submitted_data} wsd WHERE wsd.cid = %d' . $count_type_sql, $component['cid']));
+    return db_result(db_query('SELECT COUNT(*) FROM {webform_submitted_data} wsd WHERE wsd.nid = %d AND wsd.cid = %d' . $count_type_sql, $component['nid'], $component['cid']));
   }
 
 }
