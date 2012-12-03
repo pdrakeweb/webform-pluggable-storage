@@ -553,7 +553,7 @@ function webform_submission_render($node, $submission, $email, $format) {
  */
 function webform_get_submissions($filters = array(), $header = NULL, $pager_count = 0) {
   $submission_controller = webform_get_submission_controller();
-  return $submission_controller->getSubmissions($filters, $header, 0, $pager_count);
+  return $submission_controller->getSubmissions($filters, $header, NULL, $pager_count);
 }
 
 /**

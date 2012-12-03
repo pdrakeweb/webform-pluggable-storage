@@ -8,7 +8,7 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
 
   public $controller_type = 'db';
 
-  public function getSubmissions($filters = array(), $header = NULL, $pager_from = 0, $pager_count = 0) {
+  public function getSubmissions($filters = array(), $header = NULL, $pager_from = NULL, $pager_count = 0) {
     $submissions = array();
 
     if (!is_array($filters)) {
@@ -61,7 +61,12 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
       }
 
       if ($pager_count) {
-        $result = db_query_range($pager_query, $arguments, $pager_from, $pager_count);
+        if (is_numeric($pager_from)) {
+          $result = db_query_range($pager_query, $arguments, $pager_from, $pager_count);
+        }
+        else {
+          $result = pager_query($pager_query, $pager_count, 0, NULL, $arguments);
+        }
       }
       else {
         $result = db_query($pager_query, $arguments);
