@@ -50,7 +50,8 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
       }
 
       $where_clause = implode(' AND ', $where);
-      $pager_query = 'SELECT sid FROM {webform_submissions} s LEFT JOIN {users} u ON u.uid = s.uid WHERE ' . $where_clause;
+      $pager_query = 'SELECT sid FROM {webform_submissions} s LEFT JOIN {users} u ON u.uid = s.uid';
+      $pager_query .= (!empty($where_clause) ? ' WHERE ' . $where_clause : '');
 
       if (is_array($header)) {
         $pager_query .= tablesort_sql($header);
@@ -85,9 +86,9 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
         'LEFT JOIN {users} u ON u.uid = s.uid ' .
         'WHERE sd.sid IN (' . db_placeholders($sids) . ') ' .
         // By adding the NID to this query we allow MySQL to use the primary
-    // key in webform_submitted_data for sorting (nid_sid_cid_no).
-    (isset($filters['nid']) ? 'AND sd.nid = %d ' : '') .
-    'ORDER BY sd.sid ASC, sd.cid ASC, sd.no ASC';
+        // key in webform_submitted_data for sorting (nid_sid_cid_no).
+        (isset($filters['nid']) ? 'AND sd.nid = %d ' : '') .
+        'ORDER BY sd.sid ASC, sd.cid ASC, sd.no ASC';
 
     $args = $sids;
     if (isset($filters['nid'])) {
