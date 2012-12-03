@@ -13,7 +13,7 @@ interface WebformSubmissionController {
   public function getNextSubmissionID($node, $submission);
   public function getPreviousSubmissionID($node, $submission);
   public function getSubmissionCount($nid, $uid = NULL, $reset = FALSE);
-  public function getSubmissions($filters = array(), $header = NULL, $pager_count = 0);
+  public function getSubmissions($filters = array(), $header = NULL, $pager_from = 0, $pager_count = 0);
   public function insertSubmission($node, $submission);
   public function updateSubmission($node, $submission);
   public function validateComponentSubmissionUnique($nid, $cid, $value, $sid = FALSE);
