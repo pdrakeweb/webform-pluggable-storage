@@ -666,13 +666,8 @@ function _webform_submission_total_limit_check($node) {
     return FALSE; // No check enabled.
   }
 
-  // Retrieve submission data from the database.
-  $query = 'SELECT count(*) ' .
-           'FROM {webform_submissions} ' .
-           'WHERE submitted > %d AND nid = %d AND is_draft = 0';
-
-  // Fetch all the entries from the database within the submit interval.
-  $num_submissions_database = db_result(db_query($query, ($node->webform['total_submit_interval'] != -1) ? (time() - $node->webform['total_submit_interval']) : $node->webform['total_submit_interval'], $node->nid));
+  $submission_controller = webform_get_submission_controller();
+  $num_submissions_database = $submission_controller->getSubmissionCount($node->nid, NULL, NULL, $node->webform['total_submit_interval']);
 
   if ($num_submissions_database >= $node->webform['total_submit_limit']) {
     // Limit exceeded.

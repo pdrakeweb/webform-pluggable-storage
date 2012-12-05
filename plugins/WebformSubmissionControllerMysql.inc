@@ -126,25 +126,75 @@ class WebformSubmissionControllerMysql implements WebformSubmissionController, W
     return $submissions;
   }
 
-  public function getSubmissionCount($nid, $uid = NULL, $reset = FALSE) {
+  public function getSubmissionSids($nid, $range_options, $uid = NULL) {
+    $query = 'SELECT sid FROM {webform_submissions} WHERE nid = %d';
+    $args = array($nid);
+
+    switch ($range_options['range_type']) {
+      case 'all':
+        // All Submissions.
+        $query .= ' ORDER BY sid ASC';
+        break;
+      case 'new':
+        // All Since Last Download.
+        $download_info = webform_download_last_download_info($nid, $uid);
+        $last_sid = $download_info ? $download_info['sid'] : 0;
+        $query .= ' AND sid > %d ORDER BY sid ASC';
+        $args[] = $last_sid;
+        break;
+      case 'latest':
+        // Last x Submissions.
+        $query .= ' ORDER BY sid DESC LIMIT 0, %d';
+        $args[] = $range_options['latest'];
+        break;
+      case 'range':
+        // Submissions Start-End.
+        $query .=' AND sid >= %d';
+        $args[] = $range_options['start'];
+        if ($range_options['end']) {
+          $query .= ' AND sid <= %d';
+          $args[] = $range_options['end'];
+        }
+        $query .= ' ORDER BY sid ASC';
+        break;
+    }
+    $result = db_query($query, $args);
+    $sids = array();
+    while ($row = db_fetch_object($result)) {
+      $sids[] = $row->sid;
+    }
+
+    // The last x submissions option has SIDs that are in reverse order.
+    if ($range_options['range_type'] == 'latest') {
+      $sids = array_reverse($sids);
+    }
+
+    return $sids;
+  }
+
+  public function getSubmissionCount($nid, $uid = NULL, $submission_interval = -1, $reset = FALSE) {
     static $counts;
 
-  if (!isset($counts[$nid][$uid]) || $reset) {
-    $query = 'SELECT count(*) FROM {webform_submissions} WHERE nid = %d AND is_draft = 0';
-    $arguments = array($nid);
-    if ($uid !== NULL) {
-      $query .= ' AND uid = %d';
-      $arguments[] = $uid;
-    }
-    if ($uid === 0) {
-      $submissions = isset($_SESSION['webform_submission']) ? $_SESSION['webform_submission'] : array();
-      $query .= count($submissions) ? ' AND sid IN (' . db_placeholders($submissions) . ')' : ' AND sid = 0';
-      $arguments = array_merge($arguments, array_keys($submissions));
-    }
+    if (!isset($counts[$nid][$uid][$submission_interval]) || $reset) {
+      $query = 'SELECT count(*) FROM {webform_submissions} WHERE nid = %d AND is_draft = 0';
+      $arguments = array($nid);
+      if ($uid !== NULL) {
+        $query .= ' AND uid = %d';
+        $arguments[] = $uid;
+      }
+      if ($uid === 0) {
+        $submissions = isset($_SESSION['webform_submission']) ? $_SESSION['webform_submission'] : array();
+        $query .= count($submissions) ? ' AND sid IN (' . db_placeholders($submissions) . ')' : ' AND sid = 0';
+        $arguments = array_merge($arguments, array_keys($submissions));
+      }
+      if ($submission_interval != -1) {
+        $query .= ' AND submitted > %d';
+        $arguments[] = $submission_interval;
+      }
 
-    $counts[$nid][$uid] = db_result(db_query($query, $arguments));
-  }
-  return $counts[$nid][$uid];
+      $counts[$nid][$uid][$submission_interval] = db_result(db_query($query, $arguments));
+    }
+    return $counts[$nid][$uid][$submission_interval];
   }
 
   public function insertSubmission($node, $submission) {

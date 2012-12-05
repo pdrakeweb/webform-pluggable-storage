@@ -909,47 +909,8 @@ function theme_webform_results_analysis($node, $data, $sids = array(), $analysis
  * Given a set of range options, retrieve a set of SIDs for a webform node.
  */
 function webform_download_sids($nid, $range_options, $uid = NULL) {
-  $query = 'SELECT sid FROM {webform_submissions} WHERE nid = %d';
-  $args = array($nid);
-
-  switch ($range_options['range_type']) {
-    case 'all':
-      // All Submissions.
-      $query .= ' ORDER BY sid ASC';
-      break;
-    case 'new':
-      // All Since Last Download.
-      $download_info = webform_download_last_download_info($nid, $uid);
-      $last_sid = $download_info ? $download_info['sid'] : 0;
-      $query .= ' AND sid > %d ORDER BY sid ASC';
-      $args[] = $last_sid;
-      break;
-    case 'latest':
-      // Last x Submissions.
-      $query .= ' ORDER BY sid DESC LIMIT 0, %d';
-      $args[] = $range_options['latest'];
-      break;
-    case 'range':
-      // Submissions Start-End.
-      $query .=' AND sid >= %d';
-      $args[] = $range_options['start'];
-      if ($range_options['end']) {
-        $query .= ' AND sid <= %d';
-        $args[] = $range_options['end'];
-      }
-      $query .= ' ORDER BY sid ASC';
-      break;
-  }
-  $result = db_query($query, $args);
-  $sids = array();
-  while ($row = db_fetch_object($result)) {
-    $sids[] = $row->sid;
-  }
-
-  // The last x submissions option has SIDs that are in reverse order.
-  if ($range_options['range_type'] == 'latest') {
-    $sids = array_reverse($sids);
-  }
+  $submission_controller = webform_get_submission_controller();
+  $sids = $submission_controller->getSubmissionSids($nid, $range_options, $uid);
 
   return $sids;
 }
